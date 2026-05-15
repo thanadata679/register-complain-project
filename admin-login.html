@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Portal - Authentication</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body class="page-admin-login">
+
+  <header>
+    <h1>Admin Access</h1>
+    <p>Secure login portal for administrators</p>
+  </header>
+
+  <div class="form-card">
+    
+    <!-- LOGIN SECTION -->
+    <div id="section-login" class="form-section active">
+      <h2>Sign In</h2>
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label for="login-userid">User ID</label>
+          <input type="text" id="login-userid" placeholder="Enter User ID" required />
+          <div class="error-text" id="login-userid-error">User ID is required.</div>
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="Enter Password" required />
+          <div class="error-text" id="login-password-error">Password is required.</div>
+        </div>
+        <button type="submit" class="btn-submit">Login</button>
+      </form>
+      <div class="form-footer">
+        <p>Forgot password? <button onclick="switchSection('section-change-password')">Change it</button></p>
+        <p style="margin-top: 0.5rem;">New Admin? <button onclick="switchSection('section-register')">Create Account</button></p>
+      </div>
+    </div>
+
+    <!-- REGISTER SECTION -->
+    <div id="section-register" class="form-section">
+      <h2>Create New Account</h2>
+      <form id="register-form" novalidate>
+        <div class="form-group">
+          <label for="reg-userid">New User ID</label>
+          <input type="text" id="reg-userid" placeholder="Choose a strong User ID" required />
+          <div class="error-text" id="reg-userid-error">User ID must be at least 5 characters alphanumeric.</div>
+        </div>
+        <div class="form-group">
+          <label for="reg-password">Strong Password</label>
+          <input type="password" id="reg-password" placeholder="Min 8 chars, 1 uppercase, 1 number, 1 special" required />
+          <div class="error-text" id="reg-password-error">Password must be at least 8 chars, include an uppercase letter, a lowercase letter, a number, and a special character.</div>
+        </div>
+        <div class="form-group">
+          <label for="reg-confirm">Confirm Password</label>
+          <input type="password" id="reg-confirm" placeholder="Confirm your password" required />
+          <div class="error-text" id="reg-confirm-error">Passwords do not match.</div>
+        </div>
+        <button type="submit" class="btn-submit">Create Account</button>
+      </form>
+      <div class="form-footer">
+        <p>Already have an account? <button onclick="switchSection('section-login')">Sign In</button></p>
+      </div>
+    </div>
+
+    <!-- CHANGE PASSWORD SECTION -->
+    <div id="section-change-password" class="form-section">
+      <h2>Change Password</h2>
+      <form id="change-password-form" novalidate>
+        <div class="form-group">
+          <label for="cp-userid">User ID</label>
+          <input type="text" id="cp-userid" placeholder="Enter your User ID" required />
+          <div class="error-text" id="cp-userid-error">User ID is required.</div>
+        </div>
+        <div class="form-group">
+          <label for="cp-old-password">Old Password</label>
+          <input type="password" id="cp-old-password" placeholder="Enter current password" required />
+          <div class="error-text" id="cp-old-password-error">Old password is required.</div>
+        </div>
+        <div class="form-group">
+          <label for="cp-new-password">New Strong Password</label>
+          <input type="password" id="cp-new-password" placeholder="Min 8 chars, 1 uppercase, 1 number, 1 special" required />
+          <div class="error-text" id="cp-new-password-error">Password must be at least 8 chars, include an uppercase letter, a lowercase letter, a number, and a special character.</div>
+        </div>
+        <button type="submit" class="btn-submit">Update Password</button>
+      </form>
+      <div class="form-footer">
+        <p>Remembered your password? <button onclick="switchSection('section-login')">Sign In</button></p>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    // Utility functions for validation
+    const validators = {
+      userId: (val) => val.length >= 5 && /^[a-zA-Z0-9]+$/.test(val),
+      strongPassword: (val) => {
+        // Min 8 chars, at least one uppercase, one lowercase, one number, and one special character
+        const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+        return regex.test(val);
+      }
+    };
+
+    // UI Switching
+    function switchSection(sectionId) {
+      document.querySelectorAll('.form-section').forEach(sec => sec.classList.remove('active'));
+      document.getElementById(sectionId).classList.add('active');
+      // Reset forms and errors
+      document.querySelectorAll('form').forEach(f => f.reset());
+      document.querySelectorAll('.error-text').forEach(e => e.style.display = 'none');
+    }
+
+    // Show Toast
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      if (isError) {
+        toast.classList.add('error');
+      } else {
+        toast.classList.remove('error');
+      }
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    // Toggle Error display
+    function toggleError(id, show) {
+      const el = document.getElementById(id);
+      if (show) {
+        el.style.display = 'block';
+      } else {
+        el.style.display = 'none';
+      }
+    }
+
+    // --- Event Listeners ---
+
+    // Login Form Submit
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const userId = document.getElementById('login-userid').value.trim();
+      const pass = document.getElementById('login-password').value;
+
+      let valid = true;
+      if (!userId) { toggleError('login-userid-error', true); valid = false; } else { toggleError('login-userid-error', false); }
+      if (!pass) { toggleError('login-password-error', true); valid = false; } else { toggleError('login-password-error', false); }
+
+      if (valid) {
+        // Redirect to dashboard
+        showToast('Login successful!');
+        setTimeout(() => {
+          window.location.href = 'admin-dashboard.html';
+        }, 1000);
+      }
+    });
+
+    // Register Form Submit
+    document.getElementById('register-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const userId = document.getElementById('reg-userid').value.trim();
+      const pass = document.getElementById('reg-password').value;
+      const confirm = document.getElementById('reg-confirm').value;
+
+      let valid = true;
+      if (!validators.userId(userId)) { toggleError('reg-userid-error', true); valid = false; } else { toggleError('reg-userid-error', false); }
+      if (!validators.strongPassword(pass)) { toggleError('reg-password-error', true); valid = false; } else { toggleError('reg-password-error', false); }
+      if (pass !== confirm || !confirm) { toggleError('reg-confirm-error', true); valid = false; } else { toggleError('reg-confirm-error', false); }
+
+      if (valid) {
+        showToast('Account created successfully!');
+        setTimeout(() => switchSection('section-login'), 1500);
+      }
+    });
+
+    // Change Password Form Submit
+    document.getElementById('change-password-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const userId = document.getElementById('cp-userid').value.trim();
+      const oldPass = document.getElementById('cp-old-password').value;
+      const newPass = document.getElementById('cp-new-password').value;
+
+      let valid = true;
+      if (!userId) { toggleError('cp-userid-error', true); valid = false; } else { toggleError('cp-userid-error', false); }
+      if (!oldPass) { toggleError('cp-old-password-error', true); valid = false; } else { toggleError('cp-old-password-error', false); }
+      if (!validators.strongPassword(newPass)) { toggleError('cp-new-password-error', true); valid = false; } else { toggleError('cp-new-password-error', false); }
+
+      if (valid) {
+        showToast('Password changed successfully!');
+        setTimeout(() => switchSection('section-login'), 1500);
+      }
+    });
+  </script>
+</body>
+
+</html>
+
+

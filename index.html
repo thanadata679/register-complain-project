@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Complaint Registration Portal</title>
+  <meta name="description"
+    content="Submit and track your complaints easily through our secure Complaint Registration Portal." />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body class="page-index">
+
+  <!-- ── Header ── -->
+  <button onclick="logoutUser()"
+    style="position: absolute; top: 1.5rem; right: 1.5rem; background: rgba(248, 113, 113, .12); border: 1px solid rgba(248, 113, 113, .35); color: var(--danger); font-family: inherit; font-size: .85rem; font-weight: 600; padding: .5rem 1rem; border-radius: 8px; cursor: pointer; transition: background .2s;">Logout</button>
+  <header>
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path
+          d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+      </svg>
+      Complaint Portal
+    </div>
+    <h1>Register Your Complaint</h1>
+    <p>We take every complaint seriously. Fill in the form below.</p>
+  </header>
+
+  <!-- ── Form Card ── -->
+  <div class="form-card" id="form-card">
+    <h2>New Complaint</h2>
+    <form id="complaint-form" novalidate>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input type="text" id="name" placeholder="e.g. Rahul Sharma" maxlength="60" required />
+        </div>
+        <div class="form-group">
+          <label for="city">City</label>
+          <input type="text" id="city" placeholder="e.g. Mumbai" maxlength="40" required />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="mobile">Mobile Number</label>
+        <input type="tel" id="mobile" placeholder="e.g. 9876543210" maxlength="15" required />
+      </div>
+
+      <div class="form-group">
+        <label for="complaint">Complaint Details</label>
+        <textarea id="complaint" placeholder="Describe your complaint in detail…" maxlength="500" required></textarea>
+        <div class="char-info"><span id="char-count">0</span> / 500</div>
+      </div>
+
+      <!-- AI Follow-up Section -->
+      <div class="ai-section" id="ai-section">
+        <div class="ai-question-box">
+          <strong>AI Follow-up Question</strong>
+          <span id="ai-question-text">Loading question...</span>
+        </div>
+        <div class="form-group">
+          <label for="ai-answer">Your Answer</label>
+          <textarea id="ai-answer" placeholder="Please answer the question above…" required></textarea>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit" id="submit-btn">
+        <svg id="submit-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.3">
+          <line x1="22" y1="2" x2="11" y2="13" />
+          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+        </svg>
+        <div class="loader" id="submit-loader"></div>
+        <span id="submit-text">Next: Generate Follow-up</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- ── Complaints Dashboard ── -->
+  <section class="complaints-section" id="complaints-section">
+    <div class="section-header">
+      <h2>
+        Registered Complaints
+        <span class="badge" id="count-badge">0</span>
+      </h2>
+      <div class="filter-bar">
+        <input type="text" id="search-input" placeholder="🔍  Search complaints…" oninput="renderComplaints()" />
+        <button class="btn-clear-all" id="clear-all-btn" onclick="clearAll()">🗑 Clear All</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-bar" id="stats-bar"></div>
+
+    <!-- Cards -->
+    <div id="complaint-list"></div>
+  </section>
+
+  <!-- ── Toast ── -->
+  <div id="toast">
+    ✅ Complaint registered successfully!
+  </div>
+
+  <script>
+    /* ─── Gemini API Config ─── */
+    // IMPORTANT: Replace this with your actual Gemini API Key
+    const GEMINI_API_KEY = 'AIzaSyBJQqI6uu-Z7JFnboNbCjjvwobYHkLt1Vg';
+
+    /* ─── Storage helpers ─── */
+    const STORE_KEY = 'complaints_v1';
+
+    function loadComplaints() {
+      try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+      catch { return []; }
+    }
+
+    function saveComplaints(data) {
+      localStorage.setItem(STORE_KEY, JSON.stringify(data));
+    }
+
+    /* ─── Character counter ─── */
+    const complaintTA = document.getElementById('complaint');
+    const charCount = document.getElementById('char-count');
+    complaintTA.addEventListener('input', () => {
+      charCount.textContent = complaintTA.value.length;
+    });
+
+    /* ─── Form submit ─── */
+    let isAiQuestionGenerated = false;
+    let generatedAiQuestion = "";
+
+    document.getElementById('complaint-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const name = document.getElementById('name').value.trim();
+      const city = document.getElementById('city').value.trim();
+      const mobile = document.getElementById('mobile').value.trim();
+      const complaint = complaintTA.value.trim();
+
+      // Basic validation
+      if (!name || !city || !mobile || !complaint) {
+        shakeCard(); return;
+      }
+      if (!/^[0-9+\-\s]{7,15}$/.test(mobile)) {
+        alert('Please enter a valid mobile number.'); return;
+      }
+
+      if (!isAiQuestionGenerated) {
+        // Step 1: Generate AI Question
+        await handleGenerateQuestion(complaint);
+      } else {
+        // Step 2: Final Submit
+        const aiAnswer = document.getElementById('ai-answer').value.trim();
+        if (!aiAnswer) {
+          shakeCard();
+          document.getElementById('ai-answer').focus();
+          return;
+        }
+
+        const currentUserEmail = localStorage.getItem('currentUserEmail') || 'unknown@example.com';
+        const entry = {
+          id: crypto.randomUUID(),
+          name, city, mobile, complaint,
+          userEmail: currentUserEmail,
+          aiQuestion: generatedAiQuestion,
+          aiAnswer: aiAnswer,
+          timestamp: new Date().toISOString()
+        };
+
+        const data = loadComplaints();
+        data.unshift(entry);
+        saveComplaints(data);
+
+        // Reset Form
+        this.reset();
+        charCount.textContent = '0';
+        document.getElementById('ai-section').classList.remove('active');
+        isAiQuestionGenerated = false;
+        document.getElementById('submit-text').textContent = 'Next: Generate Follow-up';
+        document.getElementById('submit-icon').style.display = 'block';
+
+        showToast();
+        renderComplaints();
+      }
+    });
+
+    async function handleGenerateQuestion(complaintText) {
+      const btn = document.getElementById('submit-btn');
+      const loader = document.getElementById('submit-loader');
+      const icon = document.getElementById('submit-icon');
+      const btnText = document.getElementById('submit-text');
+
+      // Show loading
+      btn.disabled = true;
+      icon.style.display = 'none';
+      loader.style.display = 'block';
+      btnText.textContent = 'Generating...';
+
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: `A user has submitted the following complaint: "${complaintText}". Please ask one specific follow-up question to get more necessary details about this complaint. Only output the question itself, without any introduction or formatting.` }]
+            }]
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch from Gemini API');
+        }
+
+        const data = await response.json();
+        const question = data.candidates[0].content.parts[0].text.trim();
+
+        generatedAiQuestion = question;
+        document.getElementById('ai-question-text').textContent = question;
+        document.getElementById('ai-section').classList.add('active');
+        isAiQuestionGenerated = true;
+
+        // Update button for final submission
+        loader.style.display = 'none';
+        icon.style.display = 'block';
+        btnText.textContent = 'Submit Complaint';
+
+        // Focus the answer field
+        setTimeout(() => document.getElementById('ai-answer').focus(), 100);
+
+      } catch (error) {
+        console.error("AI Generation Error:", error);
+        alert("Could not generate a follow-up question. Please check your API key or network connection.");
+        // Revert button state so they can try again
+        loader.style.display = 'none';
+        icon.style.display = 'block';
+        btnText.textContent = 'Next: Generate Follow-up';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    /* ─── Delete one ─── */
+    function deleteComplaint(id) {
+      const data = loadComplaints().filter(c => c.id !== id);
+      saveComplaints(data);
+      renderComplaints();
+    }
+
+    /* ─── Clear all ─── */
+    function clearAll() {
+      if (!loadComplaints().length) return;
+      if (confirm('Are you sure you want to delete ALL complaints? This cannot be undone.')) {
+        saveComplaints([]);
+        renderComplaints();
+      }
+    }
+
+    /* ─── Render ─── */
+    function renderComplaints() {
+      const allComplaints = loadComplaints();
+      const currentUserEmail = localStorage.getItem('currentUserEmail');
+
+      // Filter to show ONLY the current user's complaints
+      const all = currentUserEmail
+        ? allComplaints.filter(c => c.userEmail === currentUserEmail)
+        : [];
+
+      const query = document.getElementById('search-input').value.toLowerCase();
+      const list = document.getElementById('complaint-list');
+      const badge = document.getElementById('count-badge');
+      const stats = document.getElementById('stats-bar');
+
+      const filtered = query
+        ? all.filter(c =>
+          c.name.toLowerCase().includes(query) ||
+          c.city.toLowerCase().includes(query) ||
+          c.complaint.toLowerCase().includes(query) ||
+          c.mobile.includes(query)
+        )
+        : all;
+
+      badge.textContent = all.length;
+
+      /* Stats */
+      const cities = [...new Set(all.map(c => c.city))];
+      stats.innerHTML = `
+      <div class="stat-chip">📋 Total &nbsp;<strong>${all.length}</strong></div>
+      <div class="stat-chip">🏙️ Cities &nbsp;<strong>${cities.length}</strong></div>
+      ${all.length ? `<div class="stat-chip">📅 Latest &nbsp;<strong>${formatDate(all[0].timestamp)}</strong></div>` : ''}
+    `;
+
+      /* Cards */
+      if (!filtered.length) {
+        list.innerHTML = `
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+          <p>${all.length ? 'No complaints match your search.' : 'No complaints yet. Submit one above!'}</p>
+        </div>`;
+        return;
+      }
+
+      list.innerHTML = filtered.map(c => `
+      <div class="complaint-card" id="card-${c.id}">
+        <div class="card-name">${escHtml(c.name)}</div>
+        <div class="card-meta">
+          <span>🏙️ ${escHtml(c.city)}</span>
+          <span>📱 ${escHtml(c.mobile)}</span>
+        </div>
+        <div class="card-complaint">${escHtml(c.complaint)}</div>
+        ${c.aiQuestion ? `
+          <div class="card-complaint" style="margin-top: .6rem; border-left-color: var(--accent2); background: rgba(167, 139, 250, 0.05);">
+            <strong style="color: var(--accent2); font-size: .75rem; text-transform: uppercase;">AI Follow-up:</strong><br/>
+            ${escHtml(c.aiQuestion)}
+            <div style="margin-top: .4rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: .4rem;">
+              <strong style="color: var(--accent1); font-size: .75rem; text-transform: uppercase;">User Answer:</strong><br/>
+              ${escHtml(c.aiAnswer)}
+            </div>
+          </div>
+        ` : ''}
+        ${c.adminComment ? `
+          <div class="card-complaint" style="margin-top: .6rem; border-left-color: var(--success); background: rgba(34, 211, 165, 0.05);">
+            <strong style="color: var(--success); font-size: .75rem; text-transform: uppercase;">Admin Status / Comment:</strong><br/>
+            ${escHtml(c.adminComment)}
+          </div>
+        ` : ''}
+        <div class="card-footer">
+          <span>${formatDate(c.timestamp)}</span>
+          <button class="btn-delete" onclick="deleteComplaint('${c.id}')">🗑 Delete</button>
+        </div>
+      </div>
+    `).join('');
+    }
+
+    /* ─── Helpers ─── */
+    function escHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatDate(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+        + ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function showToast() {
+      const t = document.getElementById('toast');
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+
+    function shakeCard() {
+      const card = document.getElementById('form-card');
+      card.style.animation = 'none';
+      card.style.outline = '2px solid var(--danger)';
+      setTimeout(() => { card.style.outline = ''; }, 700);
+    }
+
+    /* ─── Logout & Auth Check ─── */
+    function logoutUser() {
+      localStorage.removeItem('currentUserEmail');
+      window.location.href = 'login.html';
+    }
+
+    function checkAuth() {
+      if (!localStorage.getItem('currentUserEmail')) {
+        window.location.href = 'login.html';
+      }
+    }
+
+    /* ─── Init ─── */
+    checkAuth();
+    renderComplaints();
+  </script>
+</body>
+
+</html>

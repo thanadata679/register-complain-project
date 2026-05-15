@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Auth - Complaint Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="page-login">
+
+  <header>
+    <h1>User Portal</h1>
+    <p>Sign in or create an account with your Email ID.</p>
+  </header>
+
+  <div class="form-card">
+    
+    <!-- Step 1: Enter Email -->
+    <div id="step-email">
+      <h2>Welcome</h2>
+      <form id="email-form" novalidate>
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" placeholder="e.g. user@example.com" required />
+          <div class="error-text" id="email-error" style="display: none; color: var(--danger); font-size: 0.75rem; margin-top: 0.4rem;">Please enter a valid email address.</div>
+        </div>
+        <button type="submit" class="btn-submit">Continue</button>
+      </form>
+    </div>
+
+    <!-- Step 2: Verify OTP (New User) -->
+    <div id="step-otp" style="display: none;">
+      <h2>Verify Email</h2>
+      <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 1.2rem;">An OTP has been sent to <strong id="display-otp-email" style="color: var(--accent2);"></strong></p>
+      <form id="otp-form" novalidate>
+        <div class="form-group">
+          <label for="otp">One Time Password (OTP)</label>
+          <input type="text" id="otp" placeholder="Enter 4-digit OTP" required maxlength="4" style="text-align: center; letter-spacing: 0.5em; font-size: 1.2rem; font-weight: bold;" />
+          <div class="error-text" id="otp-error" style="display: none; color: var(--danger); font-size: 0.75rem; margin-top: 0.4rem;">Invalid OTP. Please try again.</div>
+        </div>
+        <button type="submit" class="btn-submit">Verify OTP</button>
+        <button type="button" class="btn-text" onclick="resetToEmail()" style="margin-top: 1rem; width: 100%; background: none; border: none; color: var(--muted); cursor: pointer; text-decoration: underline; font-family: inherit;">Change Email</button>
+      </form>
+    </div>
+
+    <!-- Step 3: Create Password (New User) -->
+    <div id="step-create-password" style="display: none;">
+      <h2>Create Password</h2>
+      <p style="font-size: 0.85rem; color: var(--success); margin-bottom: 1.2rem;">Email verified! Please secure your account.</p>
+      <form id="create-password-form" novalidate>
+        <div class="form-group">
+          <label for="new-password">New Password</label>
+          <input type="password" id="new-password" placeholder="At least 6 characters" required />
+          <div class="error-text" id="new-password-error" style="display: none; color: var(--danger); font-size: 0.75rem; margin-top: 0.4rem;">Password must be at least 6 characters.</div>
+        </div>
+        <div class="form-group">
+          <label for="confirm-password">Confirm Password</label>
+          <input type="password" id="confirm-password" placeholder="Re-enter password" required />
+          <div class="error-text" id="confirm-password-error" style="display: none; color: var(--danger); font-size: 0.75rem; margin-top: 0.4rem;">Passwords do not match.</div>
+        </div>
+        <button type="submit" class="btn-submit">Create Account & Login</button>
+      </form>
+    </div>
+
+    <!-- Step 4: Login Password (Existing User) -->
+    <div id="step-login-password" style="display: none;">
+      <h2>Enter Password</h2>
+      <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 1.2rem;">Welcome back, <strong id="display-login-email" style="color: var(--accent3);"></strong></p>
+      <form id="login-password-form" novalidate>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="Enter your password" required />
+          <div class="error-text" id="login-password-error" style="display: none; color: var(--danger); font-size: 0.75rem; margin-top: 0.4rem;">Incorrect password.</div>
+        </div>
+        <button type="submit" class="btn-submit">Login</button>
+        <button type="button" class="btn-text" onclick="resetToEmail()" style="margin-top: 1rem; width: 100%; background: none; border: none; color: var(--muted); cursor: pointer; text-decoration: underline; font-family: inherit;">Use a different account</button>
+      </form>
+    </div>
+
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    let expectedOtp = "";
+    let currentEmail = "";
+
+    // Storage helpers for simulated backend
+    function getUsers() {
+      try { return JSON.parse(localStorage.getItem('users_v1')) || {}; }
+      catch { return {}; }
+    }
+    function saveUser(email, password) {
+      const users = getUsers();
+      users[email] = password;
+      localStorage.setItem('users_v1', JSON.stringify(users));
+    }
+    function userExists(email) {
+      return !!getUsers()[email];
+    }
+    function checkPassword(email, password) {
+      return getUsers()[email] === password;
+    }
+
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      if (isError) {
+        toast.style.background = 'var(--danger)';
+        toast.style.color = '#fff';
+        toast.style.boxShadow = '0 8px 32px rgba(248, 113, 113, .35)';
+      } else {
+        toast.style.background = 'var(--success)';
+        toast.style.color = '#0f2820';
+        toast.style.boxShadow = '0 8px 32px rgba(34, 211, 165, .35)';
+      }
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    function switchStep(stepId) {
+      ['step-email', 'step-otp', 'step-create-password', 'step-login-password'].forEach(id => {
+        document.getElementById(id).style.display = 'none';
+      });
+      document.getElementById(stepId).style.display = 'block';
+    }
+
+    function resetToEmail() {
+      switchStep('step-email');
+    }
+
+    function loginSuccess(email) {
+      showToast('Login Successful!');
+      localStorage.setItem('currentUserEmail', email);
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 1000);
+    }
+
+    // Step 1: Submit Email
+    document.getElementById('email-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const emailInput = document.getElementById('email').value.trim().toLowerCase();
+      const errorText = document.getElementById('email-error');
+      
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailInput)) {
+        errorText.style.display = 'block';
+        return;
+      }
+      errorText.style.display = 'none';
+      currentEmail = emailInput;
+
+      if (userExists(currentEmail)) {
+        // Returning User
+        document.getElementById('display-login-email').textContent = currentEmail;
+        switchStep('step-login-password');
+        document.getElementById('login-password').focus();
+      } else {
+        // New User
+        document.getElementById('display-otp-email').textContent = currentEmail;
+        expectedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+        showToast('OTP Sent! Your OTP is: ' + expectedOtp);
+        console.log("Your OTP is:", expectedOtp);
+        switchStep('step-otp');
+        document.getElementById('otp').focus();
+      }
+    });
+
+    // Step 2: Submit OTP
+    document.getElementById('otp-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const otpInput = document.getElementById('otp').value.trim();
+      const errorText = document.getElementById('otp-error');
+      
+      if (otpInput !== expectedOtp) {
+        errorText.style.display = 'block';
+        return;
+      }
+      errorText.style.display = 'none';
+      
+      showToast('OTP Verified!');
+      switchStep('step-create-password');
+      document.getElementById('new-password').focus();
+    });
+
+    // Step 3: Create Password
+    document.getElementById('create-password-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const pass = document.getElementById('new-password').value;
+      const confirm = document.getElementById('confirm-password').value;
+      
+      let valid = true;
+      if (pass.length < 6) {
+        document.getElementById('new-password-error').style.display = 'block';
+        valid = false;
+      } else {
+        document.getElementById('new-password-error').style.display = 'none';
+      }
+
+      if (pass !== confirm || confirm === '') {
+        document.getElementById('confirm-password-error').style.display = 'block';
+        valid = false;
+      } else {
+        document.getElementById('confirm-password-error').style.display = 'none';
+      }
+
+      if (valid) {
+        saveUser(currentEmail, pass);
+        loginSuccess(currentEmail);
+      }
+    });
+
+    // Step 4: Login Password
+    document.getElementById('login-password-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const pass = document.getElementById('login-password').value;
+      const errorText = document.getElementById('login-password-error');
+
+      if (!checkPassword(currentEmail, pass)) {
+        errorText.style.display = 'block';
+        return;
+      }
+      errorText.style.display = 'none';
+      loginSuccess(currentEmail);
+    });
+
+  </script>
+</body>
+</html>
